@@ -1,5 +1,8 @@
 package academy.group.webflux.exception;
 
+import static java.util.OptionalDouble.of;
+
+import io.netty.util.internal.StringUtil;
 import java.util.Map;
 import java.util.Optional;
 import org.springframework.boot.autoconfigure.web.ResourceProperties;
@@ -11,6 +14,7 @@ import org.springframework.core.annotation.Order;
 import org.springframework.http.MediaType;
 import org.springframework.http.codec.ServerCodecConfigurer;
 import org.springframework.stereotype.Component;
+import org.springframework.util.StringUtils;
 import org.springframework.web.reactive.function.BodyInserters;
 import org.springframework.web.reactive.function.server.RequestPredicates;
 import org.springframework.web.reactive.function.server.RouterFunction;
@@ -33,11 +37,22 @@ public class GlobalExceptionHandler extends AbstractErrorWebExceptionHandler {
     }
 
     private Mono<ServerResponse> formatErrorResponse(ServerRequest request){
-      Map<String, Object> errorAttributesMap = getErrorAttributes(request, ErrorAttributeOptions.of(ErrorAttributeOptions.Include.STACK_TRACE));
+      String query = request.uri().getQuery();
+
+      ErrorAttributeOptions errorAttributeOptions =
+              this.isTraceEnabled(query) ? ErrorAttributeOptions.of(ErrorAttributeOptions.Include.STACK_TRACE)
+                      : ErrorAttributeOptions.defaults();
+
+      Map<String, Object> errorAttributesMap = getErrorAttributes(request, errorAttributeOptions);
+
       int status = (int) Optional.ofNullable(errorAttributesMap.get("status")).orElse(500);
 
       return ServerResponse.status(status)
               .contentType(MediaType.APPLICATION_JSON)
               .body(BodyInserters.fromValue(errorAttributesMap));
+    }
+
+    private boolean isTraceEnabled(String query){
+        return !StringUtils.isEmpty(query) && query.contains("trace=true");
     }
 }
